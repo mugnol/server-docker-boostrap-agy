@@ -1,4 +1,4 @@
-# server-bootstrap devbox image.
+# server-bootstrap devbox image (Antigravity Edition).
 # Contains: all tools from tools.txt + Node.js 20 + Google Antigravity CLI (agy).
 # Projects are cloned and configured at container START (see entrypoint.sh),
 # so no secrets or repos are baked into the image.
@@ -21,7 +21,8 @@ RUN apt-get update \
     && grep -vE '^\s*(#|$)' /tmp/tools.txt | grep -v '^docker\.io$' | xargs apt-get install -y \
     && rm -rf /var/lib/apt/lists/* /tmp/tools.txt
 
-# Install Node.js 20 LTS (required for Antigravity CLI & modern web projects)
+# Install Node.js 20 LTS (needed by modern web projects; agy itself is a
+# native binary and does NOT need Node)
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -30,13 +31,16 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 # mounted at /home/dev/projects inherits dev:dev instead of root:root
 RUN mkdir -p /home/dev/projects && chown dev:dev /home/dev/projects
 
-# Install Google Antigravity CLI (agy) as the dev user
+# User-level npm prefix (lets the agent npm-install without sudo)
 USER dev
 WORKDIR /home/dev
 RUN mkdir -p /home/dev/.npm-global \
-    && npm config set prefix '/home/dev/.npm-global' \
-    && (npm install -g @google/antigravity || curl -fsSL https://antigravity.google/install.sh | bash)
-ENV PATH="/home/dev/.npm-global/bin:/home/dev/.local/bin:/home/dev/.antigravity/bin:${PATH}"
+    && npm config set prefix '/home/dev/.npm-global'
+
+# Install Google Antigravity CLI (agy) - single native binary, official
+# installer only. There is NO npm package for it.
+RUN curl -fsSL https://antigravity.google/cli/install.sh | bash
+ENV PATH="/home/dev/.npm-global/bin:/home/dev/.local/bin:${PATH}"
 
 # Runtime configuration (repos to clone, agent task, startup logic)
 COPY --chown=dev:dev repos.txt agy-task.md /home/dev/bootstrap/

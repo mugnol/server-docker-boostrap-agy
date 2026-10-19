@@ -16,8 +16,17 @@ if [ -n "${GH_TOKEN:-}" ]; then
   chmod 600 "$HOME/.git-credentials"
 fi
 
-if [ -z "${GEMINI_API_KEY:-}" ]; then
-  echo "WARNING: GEMINI_API_KEY is not set. Unattended agy task will be skipped unless authenticated interactively."
+# Antigravity CLI headless auth: GEMINI_API_KEY alone has no effect.
+# The settings.json below selects the Gemini API provider.
+if [ -n "${GEMINI_API_KEY:-}" ]; then
+  mkdir -p "$HOME/.gemini/antigravity-cli"
+  cat > "$HOME/.gemini/antigravity-cli/settings.json" <<EOF
+{
+  "modelProvider": "gemini"
+}
+EOF
+else
+  echo "WARNING: GEMINI_API_KEY is not set. Unattended agy task will be skipped."
 fi
 
 # 1. Clone the projects listed in repos.txt (skips projects already cloned)
@@ -33,15 +42,22 @@ while read -r repo || [ -n "$repo" ]; do
     (cd "$HOME/projects/$name" && git pull --ff-only) || true
     continue
   fi
-  url="https://github.com/${repo}.git"
+  if [ -n "${GH_TOKEN:-}" ]; then
+    url="https://${GH_TOKEN}@github.com/${repo}.git"
+  else
+    url="https://github.com/${repo}.git"
+  fi
   git clone "$url" "$HOME/projects/$name" || true
 done < "$BOOTSTRAP_DIR/repos.txt"
 
 # 2. Optionally let Antigravity (agy) install, test, and start the projects.
 #    Set -e RUN_AGY_TASK=false to skip (e.g. when you only want a shell).
+#    --add-dir is required: without it, print mode works in a scratch dir.
+#    --dangerously-skip-permissions is required for unattended execution.
 if [ "${RUN_AGY_TASK:-true}" = "true" ] && [ -f "$BOOTSTRAP_DIR/agy-task.md" ] && [ -n "${GEMINI_API_KEY:-}" ]; then
   echo "Running Antigravity (agy) bootstrap task (log: ~/projects/agy-bootstrap.log)..."
-  (cd "$HOME/projects" && agy -p "$(cat "$BOOTSTRAP_DIR/agy-task.md")") \
+  (cd "$HOME/projects" && agy --add-dir "$HOME/projects" --dangerously-skip-permissions \
+    -p "$(cat "$BOOTSTRAP_DIR/agy-task.md")") \
     > "$HOME/projects/agy-bootstrap.log" 2>&1 || true
   echo "Antigravity task finished. See ~/projects/SETUP-REPORT.md"
 fi
