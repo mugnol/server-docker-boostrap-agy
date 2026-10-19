@@ -1,6 +1,8 @@
 #!/bin/bash
 # Container entrypoint: runs every time the devbox container starts.
-# Expects GEMINI_API_KEY environment variable for unattended Antigravity (agy) runs.
+# Auth model: one-time Google OAuth login inside the container (see README).
+# Optional fallback: if GEMINI_API_KEY is set, API key mode is configured
+# automatically for fully unattended runs.
 set -euo pipefail
 
 BOOTSTRAP_DIR="$HOME/bootstrap"
@@ -16,8 +18,8 @@ if [ -n "${GH_TOKEN:-}" ]; then
   chmod 600 "$HOME/.git-credentials"
 fi
 
-# Antigravity CLI headless auth: GEMINI_API_KEY alone has no effect.
-# The settings.json below selects the Gemini API provider.
+# Optional API key mode (fallback for fully unattended runs).
+# GEMINI_API_KEY alone has no effect: agy also needs modelProvider=gemini.
 if [ -n "${GEMINI_API_KEY:-}" ]; then
   mkdir -p "$HOME/.gemini/antigravity-cli"
   cat > "$HOME/.gemini/antigravity-cli/settings.json" <<EOF
@@ -25,8 +27,6 @@ if [ -n "${GEMINI_API_KEY:-}" ]; then
   "modelProvider": "gemini"
 }
 EOF
-else
-  echo "WARNING: GEMINI_API_KEY is not set. Unattended agy task will be skipped."
 fi
 
 # 1. Clone the projects listed in repos.txt (skips projects already cloned)
@@ -51,12 +51,18 @@ while read -r repo || [ -n "$repo" ]; do
 done < "$BOOTSTRAP_DIR/repos.txt"
 
 # 2. Optionally let Antigravity (agy) install, test, and start the projects.
-#    Set -e RUN_AGY_TASK=false to skip (e.g. when you only want a shell).
+#    Requires auth: either GEMINI_API_KEY set, or a previous OAuth login
+#    (stored in the devbox-gemini volume). RUN_AGY_TASK defaults to false
+#    because a fresh container has no credentials yet - log in once, then
+#    either run the task manually or restart with RUN_AGY_TASK=true.
 #    --add-dir is required: without it, print mode works in a scratch dir.
 #    --dangerously-skip-permissions is required for unattended execution.
-if [ "${RUN_AGY_TASK:-true}" = "true" ] && [ -f "$BOOTSTRAP_DIR/agy-task.md" ] && [ -n "${GEMINI_API_KEY:-}" ]; then
+#    AGY_MODEL: free API keys have NO quota for Pro models (error 429
+#    "limit: 0"). Flash models (e.g. gemini-3.6-flash) work on free tier.
+if [ "${RUN_AGY_TASK:-false}" = "true" ] && [ -f "$BOOTSTRAP_DIR/agy-task.md" ]; then
   echo "Running Antigravity (agy) bootstrap task (log: ~/projects/agy-bootstrap.log)..."
   (cd "$HOME/projects" && agy --add-dir "$HOME/projects" --dangerously-skip-permissions \
+    --model "${AGY_MODEL:-gemini-3.6-flash}" \
     -p "$(cat "$BOOTSTRAP_DIR/agy-task.md")") \
     > "$HOME/projects/agy-bootstrap.log" 2>&1 || true
   echo "Antigravity task finished. See ~/projects/SETUP-REPORT.md"
