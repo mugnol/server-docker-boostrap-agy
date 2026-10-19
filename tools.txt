@@ -1,18 +1,21 @@
 # Tools installed via apt on first boot.
 # One package per line. Lines starting with # and blank lines are ignored.
+# Note: nodejs & npm are installed via NodeSource (Node 20 LTS) in the Dockerfile.
 
 git
 curl
 wget
 jq
+ripgrep
+sqlite3
 htop
 tmux
 unzip
 build-essential
 python3-pip
 python3-venv
-nodejs
-npm
 docker.io
-openjdk-17-jdk
-maven
+
+# Uncomment below when enabling Java repositories in repos.txt:
+# openjdk-17-jdk
+# maven

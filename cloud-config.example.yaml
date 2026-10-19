@@ -1,16 +1,16 @@
 #cloud-config
 # ============================================================================
-# DigitalOcean droplet user-data TEMPLATE (Docker edition, ASCII-safe).
+# DigitalOcean droplet user-data TEMPLATE (Docker + Antigravity + Nginx).
 #
 # HOW TO USE:
 #   1. Copy this file to a private location as "cloud-config.yaml"
-#   2. Fill in your SSH public key and your Kimi Code Console API key
-#      (create one at https://www.kimi.com/code/console)
+#   2. Fill in your SSH public key and your Google Gemini API key
 #   3. Paste the FILLED file into: Create Droplet -> Advanced Options
 #      -> User Data
 #
-# The host only installs Docker and starts the "devbox" container.
-# Everything else (tools, Kimi Code, projects) lives INSIDE the container.
+# The host installs Docker + Nginx (reverse proxy :80 -> :3001) and starts
+# the "devbox" container with ports 3001 and 5173 published.
+# Everything else (tools, Antigravity CLI, projects) lives INSIDE the container.
 #
 # NEVER commit the filled file anywhere - it contains secrets.
 # ============================================================================
@@ -27,16 +27,41 @@ package_update: true
 packages:
   - git
   - docker.io
+  - nginx
+  - ufw
 
 write_files:
   # Secrets and variables - 0600, root-only, shredded at the end of the run
   - path: /opt/bootstrap/vars.env
     permissions: "0600"
     content: |
-      BOOTSTRAP_REPO=https://github.com/mugnol/server-docker-boostrap.git
-      KIMI_API_KEY=sk-kimi- < * * * Paste your API key here * * * >
+      BOOTSTRAP_REPO=https://github.com/mugnol/server-docker-boostrap-agy.git
+      GEMINI_API_KEY=< * * * Paste your Gemini API key here * * * >
       GH_TOKEN=
       # GH_TOKEN is optional: fine-grained GitHub PAT, only for private repos
+
+  # Nginx reverse proxy: forwards Droplet port 80 -> container port 3001 (HTTP + WebSockets)
+  - path: /etc/nginx/sites-available/default
+    permissions: "0644"
+    content: |
+      server {
+          listen 80 default_server;
+          listen [::]:80 default_server;
+          server_name _;
+
+          location / {
+              proxy_pass http://127.0.0.1:3001;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_read_timeout 86400s;
+              proxy_send_timeout 86400s;
+          }
+      }
 
   - path: /opt/bootstrap/run.sh
     permissions: "0755"
@@ -46,6 +71,15 @@ write_files:
       source /opt/bootstrap/vars.env
       DEV_HOME=/home/dev
 
+      # 0. Configure Host Firewall (UFW) and reload Nginx
+      ufw allow OpenSSH
+      ufw allow 80/tcp
+      ufw allow 3001/tcp
+      ufw --force enable
+      systemctl enable --now docker
+      systemctl enable --now nginx
+      nginx -t && systemctl reload nginx
+
       # 1. Fetch the bootstrap repo (Dockerfile, entrypoint.sh, lists)
       sudo -u dev git clone "$BOOTSTRAP_REPO" "$DEV_HOME/bootstrap"
 
@@ -53,16 +87,19 @@ write_files:
       cd "$DEV_HOME/bootstrap"
       docker build -t devbox .
 
-      # 3. Start the devbox container.
+      # 3. Start the devbox container with published ports (3001 & 5173).
       #    Secrets are passed as environment variables - never baked into
       #    the image. Projects live in a named volume so they survive
       #    container recreation.
       docker run -d \
         --name devbox \
         --restart unless-stopped \
-        -e KIMI_API_KEY="$KIMI_API_KEY" \
+        -p 3001:3001 \
+        -p 5173:5173 \
+        -e GEMINI_API_KEY="$GEMINI_API_KEY" \
         -e GH_TOKEN="${GH_TOKEN:-}" \
-        -e RUN_KIMI_TASK=true \
+        -e RUN_AGY_TASK=true \
+        -e COOKIE_SECURE=false \
         -v devbox-projects:/home/dev/projects \
         devbox
 
