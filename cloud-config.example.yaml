@@ -4,9 +4,13 @@
 #
 # HOW TO USE:
 #   1. Copy this file to a private location as "cloud-config.yaml"
-#   2. Fill in your SSH public key and your Google Gemini API key
+#   2. Fill in your SSH public key (and GH_TOKEN if you use private repos)
 #   3. Paste the FILLED file into: Create Droplet -> Advanced Options
 #      -> User Data
+#   4. After boot, authenticate agy once with Google OAuth:
+#        docker exec -it devbox bash
+#        agy        # choose Google OAuth, open the URL on your PC, paste the code
+#      Then run the bootstrap task manually (see entrypoint.sh step 2).
 #
 # The host installs Docker + Nginx (reverse proxy :80 -> :3001) and starts
 # the "devbox" container with ports 3001 and 5173 published.
@@ -36,9 +40,10 @@ write_files:
     permissions: "0600"
     content: |
       BOOTSTRAP_REPO=https://github.com/mugnol/server-docker-boostrap-agy.git
-      GEMINI_API_KEY=< * * * Paste your Gemini API key here * * * >
       GH_TOKEN=
-      # GH_TOKEN is optional: fine-grained GitHub PAT, only for private repos
+      # GH_TOKEN is optional: fine-grained GitHub PAT, only for private repos.
+      # Auth note: agy authenticates via Google OAuth (one interactive login
+      # after boot). No Gemini API key is needed or stored anywhere.
 
   # Nginx reverse proxy: forwards Droplet port 80 -> container port 3001 (HTTP + WebSockets)
   - path: /etc/nginx/sites-available/default
@@ -89,18 +94,19 @@ write_files:
 
       # 3. Start the devbox container with published ports (3001 & 5173).
       #    Secrets are passed as environment variables - never baked into
-      #    the image. Projects live in a named volume so they survive
-      #    container recreation.
+      #    the image. Projects AND the agy OAuth session
+      #    (~/.gemini) live in named volumes so they survive container
+      #    recreation.
       docker run -d \
         --name devbox \
         --restart unless-stopped \
         -p 3001:3001 \
         -p 5173:5173 \
-        -e GEMINI_API_KEY="$GEMINI_API_KEY" \
         -e GH_TOKEN="${GH_TOKEN:-}" \
-        -e RUN_AGY_TASK=true \
+        -e RUN_AGY_TASK=false \
         -e COOKIE_SECURE=false \
         -v devbox-projects:/home/dev/projects \
+        -v devbox-gemini:/home/dev/.gemini \
         devbox
 
       # 4. Remove secrets from disk
