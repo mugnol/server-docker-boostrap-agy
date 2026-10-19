@@ -27,9 +27,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Pre-create the projects dir with the right owner, so a named volume
-# mounted at /home/dev/projects inherits dev:dev instead of root:root
-RUN mkdir -p /home/dev/projects && chown dev:dev /home/dev/projects
+# Pre-create the projects and gemini dirs with the right owner, so named
+# volumes mounted there inherit dev:dev instead of root:root
+RUN mkdir -p /home/dev/projects /home/dev/.gemini \
+    && chown -R dev:dev /home/dev/projects /home/dev/.gemini
 
 # User-level npm prefix (lets the agent npm-install without sudo)
 USER dev

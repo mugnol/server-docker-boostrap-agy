@@ -30,9 +30,9 @@ EOF
 fi
 
 # 1. Clone the projects listed in repos.txt (skips projects already cloned)
-#    The sudo chown fixes volumes that were created with root ownership
+#    The sudo chown fixes named volumes that were created with root ownership
 mkdir -p "$HOME/projects"
-sudo chown dev:dev "$HOME/projects" 2>/dev/null || true
+sudo chown dev:dev "$HOME/projects" "$HOME/.gemini" 2>/dev/null || true
 while read -r repo || [ -n "$repo" ]; do
   repo=$(echo "$repo" | sed 's/#.*//' | xargs)
   [[ -z "$repo" ]] && continue
