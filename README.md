@@ -64,8 +64,10 @@ Everything lives **inside the container** - the host only runs Docker + Nginx.
    ```bash
    cd ~/projects
    agy --add-dir ~/projects --dangerously-skip-permissions \
-       --model "gemini-3.6-flash" -p "$(cat ~/bootstrap/agy-task.md)"
+       --model "gemini-3.8-flash-medium" -p "$(cat ~/bootstrap/agy-task.md)"
    ```
+
+   > **Note**: `agy` is pre-configured with default model `Gemini 3.8 Flash (Medium)` and `toolPermission: "always-proceed"` via `~/.gemini/antigravity-cli/settings.json`.
 
    Projects land in `~/projects` (backed by the `devbox-projects` volume) and
    the agent report is written to `~/projects/SETUP-REPORT.md`.

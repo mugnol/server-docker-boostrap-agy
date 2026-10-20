@@ -92,6 +92,7 @@ write_files:
         -e GITHUB_TOKEN="${GH_TOKEN:-}" \
         -e GIT_USER_NAME="${GIT_USER_NAME:-}" \
         -e GIT_USER_EMAIL="${GIT_USER_EMAIL:-}" \
+        -e AGY_MODEL="${AGY_MODEL:-Gemini 3.8 Flash (Medium)}" \
         -e RUN_AGY_TASK=false \
         -e COOKIE_SECURE=false \
         -v devbox-projects:/home/dev/projects \

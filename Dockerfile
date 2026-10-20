@@ -29,7 +29,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 # Pre-create the projects, gemini, and ai-memory dirs with the right owner, so named
 # volumes mounted there inherit dev:dev instead of root:root
-RUN mkdir -p /home/dev/projects /home/dev/.gemini /home/dev/.local/share/ai-memory \
+RUN mkdir -p /home/dev/projects /home/dev/.gemini/antigravity-cli /home/dev/.local/share/ai-memory \
+    && echo '{\n  "model": "Gemini 3.8 Flash (Medium)",\n  "toolPermission": "always-proceed"\n}' > /home/dev/.gemini/antigravity-cli/settings.json \
     && chown -R dev:dev /home/dev/projects /home/dev/.gemini /home/dev/.local/share/ai-memory
 
 # User-level npm prefix (lets the agent npm-install without sudo)

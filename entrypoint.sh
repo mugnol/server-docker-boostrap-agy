@@ -20,15 +20,34 @@ if [ -n "${GH_TOKEN:-}" ]; then
   chmod 600 "$HOME/.git-credentials"
 fi
 
+# Antigravity (agy) configuration: default to Flash model and always-proceed permissions.
+AGY_CONFIG_DIR="$HOME/.gemini/antigravity-cli"
+SETTINGS_FILE="$AGY_CONFIG_DIR/settings.json"
+DEFAULT_MODEL="${AGY_MODEL:-Gemini 3.8 Flash (Medium)}"
+
+mkdir -p "$AGY_CONFIG_DIR"
+
+if [ ! -f "$SETTINGS_FILE" ]; then
+  cat > "$SETTINGS_FILE" <<EOF
+{
+  "model": "$DEFAULT_MODEL",
+  "toolPermission": "always-proceed"
+}
+EOF
+else
+  if command -v jq >/dev/null 2>&1; then
+    tmp_settings=$(mktemp)
+    jq --arg model "$DEFAULT_MODEL" '.model = $model | .toolPermission = "always-proceed"' "$SETTINGS_FILE" > "$tmp_settings" && mv "$tmp_settings" "$SETTINGS_FILE"
+  fi
+fi
+
 # Optional API key mode (fallback for fully unattended runs).
 # GEMINI_API_KEY alone has no effect: agy also needs modelProvider=gemini.
 if [ -n "${GEMINI_API_KEY:-}" ]; then
-  mkdir -p "$HOME/.gemini/antigravity-cli"
-  cat > "$HOME/.gemini/antigravity-cli/settings.json" <<EOF
-{
-  "modelProvider": "gemini"
-}
-EOF
+  if command -v jq >/dev/null 2>&1 && [ -f "$SETTINGS_FILE" ]; then
+    tmp_settings=$(mktemp)
+    jq '.modelProvider = "gemini"' "$SETTINGS_FILE" > "$tmp_settings" && mv "$tmp_settings" "$SETTINGS_FILE"
+  fi
 fi
 
 # 1. Clone the projects listed in repos.txt (skips projects already cloned)
@@ -80,11 +99,11 @@ done < "$BOOTSTRAP_DIR/repos.txt"
 #    --add-dir is required: without it, print mode works in a scratch dir.
 #    --dangerously-skip-permissions is required for unattended execution.
 #    AGY_MODEL: free API keys have NO quota for Pro models (error 429
-#    "limit: 0"). Flash models (e.g. gemini-3.6-flash) work on free tier.
+#    "limit: 0"). Flash models (e.g. gemini-3.8-flash-medium) work on free tier.
 if [ "${RUN_AGY_TASK:-false}" = "true" ] && [ -f "$BOOTSTRAP_DIR/agy-task.md" ]; then
   echo "Running Antigravity (agy) bootstrap task (log: ~/projects/agy-bootstrap.log)..."
   (cd "$HOME/projects" && agy --add-dir "$HOME/projects" --dangerously-skip-permissions \
-    --model "${AGY_MODEL:-gemini-3.6-flash}" \
+    --model "${AGY_CLI_MODEL:-gemini-3.8-flash-medium}" \
     -p "$(cat "$BOOTSTRAP_DIR/agy-task.md")") \
     > "$HOME/projects/agy-bootstrap.log" 2>&1 || true
   echo "Antigravity task finished. See ~/projects/SETUP-REPORT.md"
