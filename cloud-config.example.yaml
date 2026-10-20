@@ -75,6 +75,7 @@ write_files:
         -e COOKIE_SECURE=false \
         -v devbox-projects:/home/dev/projects \
         -v devbox-gemini:/home/dev/.gemini \
+        -v devbox-aimemory:/home/dev/.local/share/ai-memory \
         devbox
 
       # 3. HTTPS only when DOMAIN is set

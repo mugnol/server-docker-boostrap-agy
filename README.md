@@ -6,12 +6,13 @@ Nginx, configures the host firewall (UFW), builds the `devbox` image from this
 repository, and starts a container that:
 
 1. Installs every apt package listed in [`tools.txt`](tools.txt) (image build)
-2. Installs **Google Antigravity CLI (`agy`)** and Node.js 20 (image build)
-3. Clones every repository listed in [`repos.txt`](repos.txt) into `~/projects` (container start)
-4. After a one-time Google OAuth login, runs Antigravity with the task in
+2. Installs **Google Antigravity CLI (`agy`)**, **[ai-memory](https://github.com/akitaonrails/ai-memory)**, and Node.js 20 (image build)
+3. Configures and starts the `ai-memory` HTTP server (`:49374`) with MCP & hooks pre-wired for Antigravity (container start)
+4. Clones every repository listed in [`repos.txt`](repos.txt) into `~/projects` (container start)
+5. After a one-time Google OAuth login, runs Antigravity with the task in
    [`agy-task.md`](agy-task.md) so each project gets its dependencies
    installed, tested, and started in production mode
-5. Exposes port `3001` from the container and proxies standard HTTP port `80`
+6. Exposes port `3001` from the container and proxies standard HTTP port `80`
    (with WebSockets) via Nginx on the host
 
 Everything lives **inside the container** - the host only runs Docker + Nginx.
@@ -63,6 +64,24 @@ Everything lives **inside the container** - the host only runs Docker + Nginx.
 
    Projects land in `~/projects` (backed by the `devbox-projects` volume) and
    the agent report is written to `~/projects/SETUP-REPORT.md`.
+
+6. (Optional) Inspect shared agent memory via **ai-memory Web UI**:
+
+   ai-memory is automatically started and wired with Antigravity hooks & MCP.
+   The wiki and embeddings persist across container restarts via the
+   `devbox-aimemory` volume.
+   To access the web interface from your local machine:
+
+   ```bash
+   ssh -L 49374:localhost:49374 dev@<droplet-ip>
+   ```
+
+   Then open `http://localhost:49374/web` in your browser. When prompted for
+   credentials, use any username and copy the bearer token from the container:
+
+   ```bash
+   docker exec -it devbox cat /home/dev/.local/share/ai-memory/auth-tokens/default
+   ```
 
 ## Local usage
 

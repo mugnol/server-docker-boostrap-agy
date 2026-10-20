@@ -27,10 +27,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Pre-create the projects and gemini dirs with the right owner, so named
+# Pre-create the projects, gemini, and ai-memory dirs with the right owner, so named
 # volumes mounted there inherit dev:dev instead of root:root
-RUN mkdir -p /home/dev/projects /home/dev/.gemini \
-    && chown -R dev:dev /home/dev/projects /home/dev/.gemini
+RUN mkdir -p /home/dev/projects /home/dev/.gemini /home/dev/.local/share/ai-memory \
+    && chown -R dev:dev /home/dev/projects /home/dev/.gemini /home/dev/.local/share/ai-memory
 
 # User-level npm prefix (lets the agent npm-install without sudo)
 USER dev
@@ -42,6 +42,9 @@ RUN mkdir -p /home/dev/.npm-global \
 # installer only. There is NO npm package for it.
 RUN curl -fsSL https://antigravity.google/cli/install.sh | bash
 ENV PATH="/home/dev/.npm-global/bin:/home/dev/.local/bin:${PATH}"
+
+# Install ai-memory CLI - shared long-term memory for coding agents
+RUN curl -fsSL https://github.com/akitaonrails/ai-memory/releases/latest/download/install.sh | sh
 
 # Runtime configuration (repos to clone, agent task, startup logic)
 COPY --chown=dev:dev repos.txt agy-task.md /home/dev/bootstrap/

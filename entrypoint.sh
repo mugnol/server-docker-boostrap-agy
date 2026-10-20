@@ -31,8 +31,27 @@ fi
 
 # 1. Clone the projects listed in repos.txt (skips projects already cloned)
 #    The sudo chown fixes named volumes that were created with root ownership
-mkdir -p "$HOME/projects"
-sudo chown dev:dev "$HOME/projects" "$HOME/.gemini" 2>/dev/null || true
+mkdir -p "$HOME/projects" "$HOME/.local/share/ai-memory"
+sudo chown -R dev:dev "$HOME/projects" "$HOME/.gemini" "$HOME/.local/share/ai-memory" 2>/dev/null || true
+
+# 2. Configure and start ai-memory (shared long-term memory for coding agents)
+if command -v ai-memory >/dev/null 2>&1; then
+  echo "Setting up ai-memory for antigravity-cli..."
+  ai-memory setup --yes --no-service --agent antigravity-cli || true
+
+  if ! pgrep -f "ai-memory serve" >/dev/null; then
+    echo "Starting ai-memory server..."
+    nohup ai-memory serve --transport http --enable-web > "$HOME/.local/share/ai-memory/ai-memory.log" 2>&1 &
+    for _ in $(seq 1 10); do
+      if curl -s http://127.0.0.1:49374/healthz >/dev/null; then
+        echo "ai-memory server is healthy."
+        break
+      fi
+      sleep 0.5
+    done
+  fi
+fi
+
 while read -r repo || [ -n "$repo" ]; do
   repo=$(echo "$repo" | sed 's/#.*//' | xargs)
   [[ -z "$repo" ]] && continue
@@ -66,6 +85,9 @@ if [ "${RUN_AGY_TASK:-false}" = "true" ] && [ -f "$BOOTSTRAP_DIR/agy-task.md" ];
     -p "$(cat "$BOOTSTRAP_DIR/agy-task.md")") \
     > "$HOME/projects/agy-bootstrap.log" 2>&1 || true
   echo "Antigravity task finished. See ~/projects/SETUP-REPORT.md"
+  if command -v ai-memory >/dev/null 2>&1; then
+    ai-memory finalize-session --agent antigravity-cli 2>/dev/null || true
+  fi
 fi
 
 # 3. Ensure any project with start-production.sh is running (survives container restarts)
