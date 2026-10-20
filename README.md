@@ -33,9 +33,14 @@ Everything lives **inside the container** - the host only runs Docker + Nginx.
 
 1. Edit `tools.txt` and `repos.txt` to match your setup.
 2. Copy [`cloud-config.example.yaml`](cloud-config.example.yaml) to a private
-   `cloud-config.yaml`, fill in your SSH public key (and optionally `GH_TOKEN`
-   for private repos), and paste it into the droplet's **User Data** field
+   `cloud-config.yaml`, fill in your SSH public key, and set your Git credentials:
+   - `GH_TOKEN`: Your GitHub Personal Access Token (classic with `repo` scope, or fine-grained with Contents Read & Write).
+   - `GIT_USER_NAME`: Your GitHub username (e.g. `mugnol`).
+   - `GIT_USER_EMAIL`: Your GitHub commit email (e.g. `user@example.com`).
+   Then paste it into the droplet's **User Data** field (under *Advanced Options*)
    when creating a DigitalOcean droplet (Ubuntu 24.04).
+   Both the host and the `devbox` container will be pre-configured with Git credentials
+   and store helper, allowing cloning private repos, committing, and pushing immediately.
 3. SSH in after boot and check the infrastructure:
 
    ```bash

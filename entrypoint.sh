@@ -8,13 +8,15 @@ set -euo pipefail
 BOOTSTRAP_DIR="$HOME/bootstrap"
 
 # Git identity and push credentials, so the agent can commit and push.
-# GIT_USER_NAME / GIT_USER_EMAIL have defaults; GH_TOKEN is optional but
-# required for pushing (needs Contents: Read and Write on the repo).
+# GIT_USER_NAME / GIT_USER_EMAIL have defaults; GH_TOKEN / GITHUB_TOKEN is optional
+# but required for cloning private repos and pushing to git.
 git config --global user.name "${GIT_USER_NAME:-devbox-agent}"
 git config --global user.email "${GIT_USER_EMAIL:-devbox@localhost}"
+GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
 if [ -n "${GH_TOKEN:-}" ]; then
   git config --global credential.helper store
-  echo "https://x-access-token:${GH_TOKEN}@github.com" > "$HOME/.git-credentials"
+  AUTH_USER="${GIT_USER_NAME:-x-access-token}"
+  echo "https://${AUTH_USER}:${GH_TOKEN}@github.com" > "$HOME/.git-credentials"
   chmod 600 "$HOME/.git-credentials"
 fi
 
@@ -61,12 +63,13 @@ while read -r repo || [ -n "$repo" ]; do
     (cd "$HOME/projects/$name" && git pull --ff-only) || true
     continue
   fi
-  if [ -n "${GH_TOKEN:-}" ]; then
-    url="https://${GH_TOKEN}@github.com/${repo}.git"
-  else
-    url="https://github.com/${repo}.git"
+  url="https://github.com/${repo}.git"
+  if ! git clone "$url" "$HOME/projects/$name"; then
+    if [ -n "${GH_TOKEN:-}" ]; then
+      echo "Retrying clone with embedded token for $name..."
+      git clone "https://${GH_TOKEN}@github.com/${repo}.git" "$HOME/projects/$name" || true
+    fi
   fi
-  git clone "$url" "$HOME/projects/$name" || true
 done < "$BOOTSTRAP_DIR/repos.txt"
 
 # 2. Optionally let Antigravity (agy) install, test, and start the projects.

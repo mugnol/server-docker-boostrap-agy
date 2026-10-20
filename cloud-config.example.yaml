@@ -5,7 +5,8 @@
 # Fill in:
 #   1. Your SSH public key below
 #   2. DOMAIN + LE_EMAIL when you have a domain (HTTPS); leave empty for now
-#   3. GH_TOKEN only if repos.txt contains private repos
+#   3. GH_TOKEN (GitHub Personal Access Token) to allow cloning private repos and pushing to git
+#   4. GIT_USER_NAME and GIT_USER_EMAIL for commit authorship
 #
 # Everything else lives in the bootstrap repo (BOOTSTRAP_REPO below), which
 # run.sh clones at boot - that is the "external reference".
@@ -31,7 +32,10 @@ write_files:
     permissions: "0600"
     content: |
       BOOTSTRAP_REPO=https://github.com/mugnol/server-docker-boostrap-agy.git
+      # GitHub Personal Access Token (classic with 'repo' scope or fine-grained):
       GH_TOKEN=
+      GIT_USER_NAME=
+      GIT_USER_EMAIL=
       # Leave empty until you have a domain with an A record to this droplet:
       DOMAIN=
       LE_EMAIL=
@@ -52,6 +56,20 @@ write_files:
       systemctl enable --now docker
       systemctl enable --now nginx
 
+      # 0.1 Configure Git credentials and identity on the host
+      if [ -n "${GH_TOKEN:-}" ]; then
+        sudo -u dev git config --global credential.helper store
+        AUTH_USER="${GIT_USER_NAME:-x-access-token}"
+        sudo -u dev bash -c "echo 'https://${AUTH_USER}:${GH_TOKEN}@github.com' > $DEV_HOME/.git-credentials"
+        chmod 600 "$DEV_HOME/.git-credentials"
+      fi
+      if [ -n "${GIT_USER_NAME:-}" ]; then
+        sudo -u dev git config --global user.name "$GIT_USER_NAME"
+      fi
+      if [ -n "${GIT_USER_EMAIL:-}" ]; then
+        sudo -u dev git config --global user.email "$GIT_USER_EMAIL"
+      fi
+
       # 1. "External reference": clone the bootstrap repo and read config
       #    files from it (nginx conf, Dockerfile, entrypoint, repos.txt)
       sudo -u dev git clone "$BOOTSTRAP_REPO" "$DEV_HOME/bootstrap"
@@ -71,6 +89,9 @@ write_files:
         -p 3001:3001 \
         -p 5173:5173 \
         -e GH_TOKEN="${GH_TOKEN:-}" \
+        -e GITHUB_TOKEN="${GH_TOKEN:-}" \
+        -e GIT_USER_NAME="${GIT_USER_NAME:-}" \
+        -e GIT_USER_EMAIL="${GIT_USER_EMAIL:-}" \
         -e RUN_AGY_TASK=false \
         -e COOKIE_SECURE=false \
         -v devbox-projects:/home/dev/projects \
