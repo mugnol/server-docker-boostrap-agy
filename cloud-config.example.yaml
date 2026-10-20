@@ -1,22 +1,14 @@
 #cloud-config
 # ============================================================================
-# DigitalOcean droplet user-data TEMPLATE (Docker + Antigravity + Nginx).
+# DigitalOcean droplet user-data - deterministic deploy, no agent needed.
 #
-# HOW TO USE:
-#   1. Copy this file to a private location as "cloud-config.yaml"
-#   2. Fill in your SSH public key (and GH_TOKEN if you use private repos)
-#   3. Paste the FILLED file into: Create Droplet -> Advanced Options
-#      -> User Data
-#   4. After boot, authenticate agy once with Google OAuth:
-#        docker exec -it devbox bash
-#        agy        # choose Google OAuth, open the URL on your PC, paste the code
-#      Then run the bootstrap task manually (see entrypoint.sh step 2).
+# Fill in:
+#   1. Your SSH public key below
+#   2. DOMAIN + LE_EMAIL when you have a domain (HTTPS); leave empty for now
+#   3. GH_TOKEN only if repos.txt contains private repos
 #
-# The host installs Docker + Nginx (reverse proxy :80 -> :3001) and starts
-# the "devbox" container with ports 3001 and 5173 published.
-# Everything else (tools, Antigravity CLI, projects) lives INSIDE the container.
-#
-# NEVER commit the filled file anywhere - it contains secrets.
+# Everything else lives in the bootstrap repo (BOOTSTRAP_REPO below), which
+# run.sh clones at boot - that is the "external reference".
 # ============================================================================
 
 users:
@@ -35,38 +27,14 @@ packages:
   - ufw
 
 write_files:
-  # Secrets and variables - 0600, root-only, shredded at the end of the run
   - path: /opt/bootstrap/vars.env
     permissions: "0600"
     content: |
       BOOTSTRAP_REPO=https://github.com/mugnol/server-docker-boostrap-agy.git
       GH_TOKEN=
-      # GH_TOKEN is optional: fine-grained GitHub PAT, only for private repos.
-      # Auth note: agy authenticates via Google OAuth (one interactive login
-      # after boot). No Gemini API key is needed or stored anywhere.
-
-  # Nginx reverse proxy: forwards Droplet port 80 -> container port 3001 (HTTP + WebSockets)
-  - path: /etc/nginx/sites-available/default
-    permissions: "0644"
-    content: |
-      server {
-          listen 80 default_server;
-          listen [::]:80 default_server;
-          server_name _;
-
-          location / {
-              proxy_pass http://127.0.0.1:3001;
-              proxy_http_version 1.1;
-              proxy_set_header Upgrade $http_upgrade;
-              proxy_set_header Connection "upgrade";
-              proxy_set_header Host $host;
-              proxy_set_header X-Real-IP $remote_addr;
-              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto $scheme;
-              proxy_read_timeout 86400s;
-              proxy_send_timeout 86400s;
-          }
-      }
+      # Leave empty until you have a domain with an A record to this droplet:
+      DOMAIN=
+      LE_EMAIL=
 
   - path: /opt/bootstrap/run.sh
     permissions: "0755"
@@ -76,27 +44,27 @@ write_files:
       source /opt/bootstrap/vars.env
       DEV_HOME=/home/dev
 
-      # 0. Configure Host Firewall (UFW) and reload Nginx
+      # 0. Firewall, Docker, Nginx
       ufw allow OpenSSH
       ufw allow 80/tcp
-      ufw allow 3001/tcp
+      ufw allow 443/tcp
       ufw --force enable
       systemctl enable --now docker
       systemctl enable --now nginx
-      nginx -t && systemctl reload nginx
 
-      # 1. Fetch the bootstrap repo (Dockerfile, entrypoint.sh, lists)
+      # 1. "External reference": clone the bootstrap repo and read config
+      #    files from it (nginx conf, Dockerfile, entrypoint, repos.txt)
       sudo -u dev git clone "$BOOTSTRAP_REPO" "$DEV_HOME/bootstrap"
 
-      # 2. Build the devbox image
+      cp "$DEV_HOME/bootstrap/nginx-default.conf" /etc/nginx/sites-available/default
+      sed -i "s/__DOMAIN__/${DOMAIN:-_}/" /etc/nginx/sites-available/default
+      nginx -t && systemctl reload nginx
+
+      # 2. Build and start the devbox container. The entrypoint clones the
+      #    repos from repos.txt and runs each project's start-production.sh
+      #    (rpg-virtual-tabletop ships one) - fully deterministic, no agy.
       cd "$DEV_HOME/bootstrap"
       docker build -t devbox .
-
-      # 3. Start the devbox container with published ports (3001 & 5173).
-      #    Secrets are passed as environment variables - never baked into
-      #    the image. Projects AND the agy OAuth session
-      #    (~/.gemini) live in named volumes so they survive container
-      #    recreation.
       docker run -d \
         --name devbox \
         --restart unless-stopped \
@@ -108,6 +76,14 @@ write_files:
         -v devbox-projects:/home/dev/projects \
         -v devbox-gemini:/home/dev/.gemini \
         devbox
+
+      # 3. HTTPS only when DOMAIN is set
+      if [ -n "${DOMAIN:-}" ] && [ -n "${LE_EMAIL:-}" ]; then
+        apt-get install -y certbot python3-certbot-nginx
+        certbot --nginx -d "$DOMAIN" --email "$LE_EMAIL" \
+          --agree-tos --no-eff-email --redirect --non-interactive
+        systemctl enable --now certbot.timer
+      fi
 
       # 4. Remove secrets from disk
       shred -u /opt/bootstrap/vars.env 2>/dev/null || rm -f /opt/bootstrap/vars.env
