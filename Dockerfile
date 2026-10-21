@@ -29,9 +29,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 # Pre-create the projects, gemini, and ai-memory dirs with the right owner, so named
 # volumes mounted there inherit dev:dev instead of root:root
-RUN mkdir -p /home/dev/projects /home/dev/.gemini/antigravity-cli /home/dev/.local/share/ai-memory \
-    && echo '{\n  "model": "Gemini 3.8 Flash (Medium)",\n  "toolPermission": "always-proceed"\n}' > /home/dev/.gemini/antigravity-cli/settings.json \
-    && chown -R dev:dev /home/dev/projects /home/dev/.gemini /home/dev/.local/share/ai-memory
+# chown the whole /home/dev/.local (not just .../ai-memory): a recursive chown
+# on the leaf dir leaves its parents (.local, .local/share) root-owned, and the
+# agy installer later fails to create /home/dev/.local/bin as USER dev.
+RUN mkdir -p /home/dev/projects /home/dev/.gemini/antigravity-cli /home/dev/.local/bin /home/dev/.local/share/ai-memory \
+    && printf '{\n  "model": "Gemini 3.8 Flash (Medium)",\n  "toolPermission": "always-proceed"\n}\n' > /home/dev/.gemini/antigravity-cli/settings.json \
+    && chown -R dev:dev /home/dev/projects /home/dev/.gemini /home/dev/.local
 
 # User-level npm prefix (lets the agent npm-install without sudo)
 USER dev
