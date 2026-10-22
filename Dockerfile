@@ -55,6 +55,6 @@ COPY --chown=dev:dev repos.txt agy-task.md /home/dev/bootstrap/
 COPY --chown=dev:dev entrypoint.sh /home/dev/entrypoint.sh
 RUN chmod +x /home/dev/entrypoint.sh
 
-EXPOSE 3001 5173
+EXPOSE 3000 3001 5173
 
 ENTRYPOINT ["/home/dev/entrypoint.sh"]

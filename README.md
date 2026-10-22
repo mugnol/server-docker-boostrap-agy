@@ -12,8 +12,9 @@ repository, and starts a container that:
 5. After a one-time Google OAuth login, runs Antigravity with the task in
    [`agy-task.md`](agy-task.md) so each project gets its dependencies
    installed, tested, and started in production mode
-6. Exposes port `3001` from the container and proxies standard HTTP port `80`
-   (with WebSockets) via Nginx on the host
+6. Exposes ports `3000`, `3001`, and `5173` from the container, allowing both
+   systems (`rpg-virtual-tabletop` and `rpgvtt`) to run side-by-side, while
+   proxying standard HTTP port `80` (with WebSockets) via Nginx on the host
 
 Everything lives **inside the container** - the host only runs Docker + Nginx.
 
@@ -26,7 +27,7 @@ Everything lives **inside the container** - the host only runs Docker + Nginx.
 | `tools.txt`                 | apt packages to install (one per line, `#` comments)             |
 | `repos.txt`                 | GitHub repos to clone, `username/repo` per line                  |
 | `agy-task.md`               | Instructions Antigravity (`agy`) executes on demand              |
-| `nginx-default.conf`        | Host Nginx reverse proxy (:80 -> 127.0.0.1:3001 with WebSockets) |
+| `nginx-default.conf`        | Host Nginx reverse proxy (:80 -> :3001, plus /api/v1/ and /socket.io/ -> :3000) |
 | `cloud-config.example.yaml` | Droplet user-data template - copy, fill, paste into DO           |
 
 ## Usage
@@ -110,6 +111,6 @@ docker run -it --rm devbox bash
 - Private repositories require a fine-grained GitHub PAT (`GH_TOKEN`, with
   Contents Read+Write if the agent should push). With a public bootstrap
   repo, prefer cloning public repos only.
-- The container publishes ports 3001/5173 and Nginx exposes port 80 publicly.
+- The container publishes ports 3000/3001/5173 and Nginx exposes port 80 publicly.
   Do not run anything with real secrets or personal data on these ports
   without adding authentication.
