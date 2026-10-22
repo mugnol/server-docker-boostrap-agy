@@ -82,8 +82,8 @@ write_files:
       nginx -t && systemctl reload nginx
 
       # 2. Build and start the devbox container. The entrypoint clones the
-      #    repos from repos.txt and runs each project's start-production.sh
-      #    (rpg-virtual-tabletop ships one) - fully deterministic, no agy.
+      #    repos from repos.txt and runs each project's start-development.sh
+      #    or start-production.sh (rpgvtt / rpg-virtual-tabletop) - fully deterministic.
       cd "$DEV_HOME/bootstrap"
       docker build -t devbox .
       docker run -d \

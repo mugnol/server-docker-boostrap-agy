@@ -112,10 +112,13 @@ if [ "${RUN_AGY_TASK:-false}" = "true" ] && [ -f "$BOOTSTRAP_DIR/agy-task.md" ];
   fi
 fi
 
-# 3. Ensure any project with start-production.sh is running (survives container restarts)
+# 3. Ensure any project with start-development.sh or start-production.sh is running (survives container restarts)
 for proj_dir in "$HOME/projects"/*/; do
   [ -d "$proj_dir" ] || continue
-  if [ -f "${proj_dir}start-production.sh" ]; then
+  if [ -f "${proj_dir}start-development.sh" ]; then
+    echo "Starting development service in $proj_dir..."
+    (cd "$proj_dir" && chmod +x start-development.sh && ./start-development.sh) || true
+  elif [ -f "${proj_dir}start-production.sh" ]; then
     echo "Starting production service in $proj_dir..."
     (cd "$proj_dir" && chmod +x start-production.sh && ./start-production.sh) || true
   fi
