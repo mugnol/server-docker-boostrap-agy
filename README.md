@@ -27,7 +27,7 @@ Everything lives **inside the container** - the host only runs Docker + Nginx.
 | `tools.txt`                 | apt packages to install (one per line, `#` comments)             |
 | `repos.txt`                 | GitHub repos to clone, `username/repo` per line                  |
 | `agy-task.md`               | Instructions Antigravity (`agy`) executes on demand              |
-| `nginx-default.conf`        | Host Nginx reverse proxy (:80 -> :3001, plus /api/v1/ and /socket.io/ -> :3000) |
+| `nginx-default.conf`        | Host Nginx reverse proxy (:80 -> :3000 for fullstack app, /api/v1/, and /socket.io/) |
 | `cloud-config.example.yaml` | Droplet user-data template - copy, fill, paste into DO           |
 
 ## Usage
